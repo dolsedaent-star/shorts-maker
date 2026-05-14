@@ -8,6 +8,7 @@ import { ScenarioPicker } from '@/components/ScenarioPicker';
 import { SectionEditor } from '@/components/SectionEditor';
 import { Storyboard } from '@/components/Storyboard';
 import { RenderProgress } from '@/components/RenderProgress';
+import { StickerManager } from '@/components/StickerManager';
 import { SubtitleStyleEditor } from '@/components/SubtitleStyleEditor';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
@@ -209,6 +210,7 @@ function VideoWorkflow({ id }: { id: string }) {
             onChanged={refresh}
           />
           <BgmUpload videoId={video.id} hasBgm={!!video.bgmPath} onChanged={refresh} />
+          <StickerManager videoId={video.id} videoDuration={video.durationSeconds} />
           {activeJobId ? (
             <RenderProgress
               jobId={activeJobId}

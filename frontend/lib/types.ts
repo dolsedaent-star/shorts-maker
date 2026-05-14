@@ -17,6 +17,41 @@ export type ScenarioAngle =
 export type LLMProvider = 'GEMINI_PRO' | 'GEMINI_FLASH' | 'CLAUDE_SONNET' | 'MANUAL_EDIT';
 export type TrimField = 'SCRIPT_TEXT' | 'VIDEO_PROMPT';
 export type RenderJobStatus = 'QUEUED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+export type StickerPosition =
+  | 'TOP_LEFT' | 'TOP_CENTER' | 'TOP_RIGHT'
+  | 'MIDDLE_LEFT' | 'CENTER' | 'MIDDLE_RIGHT'
+  | 'BOTTOM_LEFT' | 'BOTTOM_CENTER' | 'BOTTOM_RIGHT';
+export type StickerScale = 'SMALL' | 'MEDIUM' | 'LARGE';
+
+export type Sticker = {
+  id: string;
+  videoId: string;
+  imagePath: string;
+  originalName: string;
+  position: StickerPosition;
+  scale: StickerScale;
+  startSec: number;
+  endSec: number;
+  createdAt: string;
+};
+
+export const POSITION_LABEL: Record<StickerPosition, string> = {
+  TOP_LEFT: '↖', TOP_CENTER: '↑', TOP_RIGHT: '↗',
+  MIDDLE_LEFT: '←', CENTER: '·', MIDDLE_RIGHT: '→',
+  BOTTOM_LEFT: '↙', BOTTOM_CENTER: '↓', BOTTOM_RIGHT: '↘',
+};
+
+export const POSITION_ORDER: StickerPosition[] = [
+  'TOP_LEFT', 'TOP_CENTER', 'TOP_RIGHT',
+  'MIDDLE_LEFT', 'CENTER', 'MIDDLE_RIGHT',
+  'BOTTOM_LEFT', 'BOTTOM_CENTER', 'BOTTOM_RIGHT',
+];
+
+export const SCALE_LABEL: Record<StickerScale, string> = {
+  SMALL: '작게 (15%)',
+  MEDIUM: '보통 (25%)',
+  LARGE: '크게 (40%)',
+};
 
 export type Project = {
   id: string;

@@ -1,7 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { VideoStatus } from '@prisma/client';
+import { StickerPosition, StickerScale, VideoStatus } from '@prisma/client';
 import { env } from '../../config/env.js';
 import { prisma } from '../../lib/prisma.js';
 import {
@@ -42,6 +42,7 @@ export async function renderVideo(
     include: {
       project: true,
       sections: { orderBy: { orderIndex: 'asc' } },
+      stickers: { orderBy: { startSec: 'asc' } },
     },
   });
 
@@ -170,36 +171,85 @@ export async function renderVideo(
     return { startSec: start, endSec: cursor, text: s.scriptText };
   });
   const assPath = path.join(renderDir, '_subtitle.ass');
-  await fs.writeFile(assPath, generateAssFile(subSections, style), 'utf-8');
+  await fs.writeFile(assPath, generateAssFile(subSections, style, video.project.appName), 'utf-8');
 
-  // ── 6) 최종 mux + 자막 burn (70-95%) ─────────────────────────────
+  // ── 6) 최종 mux + 자막 burn + 스티커 오버레이 (70-95%) ──────────
   const version = await nextRenderVersion(videoId);
   const finalPath = renderArtifactPath(videoId, version);
+  const hasStickers = video.stickers.length > 0;
 
-  await runFfmpeg((cmd) =>
-    cmd
-      .input(concatVideoPath)
-      .input(finalAudioPath)
-      .videoFilter(`subtitles=${escapeSubtitlesPath(assPath)}`)
-      .videoCodec('libx264')
-      .audioCodec('aac')
-      .outputOptions([
-        '-preset', 'medium',
-        '-crf', '20',
-        '-pix_fmt', 'yuv420p',
-        '-movflags', '+faststart',
-        '-shortest',
-      ])
-      .on('progress', (p) => {
-        if (typeof p.percent === 'number') {
-          onProgress?.({
-            step: '최종 렌더링 + 자막 번인',
-            pct: Math.round(70 + (Math.min(100, p.percent) / 100) * 25),
-          });
-        }
-      })
-      .save(finalPath)
-  );
+  if (hasStickers) {
+    // 복잡 필터: 자막 burn + 스티커 N개 overlay 체인
+    await runFfmpeg((cmd) => {
+      cmd.input(concatVideoPath).input(finalAudioPath);
+      video.stickers.forEach((s) => cmd.input(s.imagePath));
+
+      const filters: string[] = [
+        `[0:v]subtitles=${escapeSubtitlesPath(assPath)}[v_sub]`,
+      ];
+      let lastLabel = 'v_sub';
+      video.stickers.forEach((s, i) => {
+        const inputIdx = i + 2; // 0=video, 1=audio
+        const widthPx = scaleToPixels(s.scale);
+        const pos = positionExpr(s.position);
+        filters.push(`[${inputIdx}:v]scale=${widthPx}:-1[s${i}]`);
+        const outLabel = `v_o${i}`;
+        filters.push(
+          `[${lastLabel}][s${i}]overlay=${pos}:enable='between(t\\,${s.startSec}\\,${s.endSec})'[${outLabel}]`
+        );
+        lastLabel = outLabel;
+      });
+
+      return cmd
+        .complexFilter(filters)
+        .outputOptions([
+          '-map', `[${lastLabel}]`,
+          '-map', '1:a',
+          '-c:v', 'libx264',
+          '-c:a', 'aac',
+          '-preset', 'medium',
+          '-crf', '20',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-shortest',
+        ])
+        .on('progress', (p) => {
+          if (typeof p.percent === 'number') {
+            onProgress?.({
+              step: `최종 렌더링 + 자막 + 스티커 ${video.stickers.length}개`,
+              pct: Math.round(70 + (Math.min(100, p.percent) / 100) * 25),
+            });
+          }
+        })
+        .save(finalPath);
+    });
+  } else {
+    // 스티커 없음: 단순 videoFilter 경로
+    await runFfmpeg((cmd) =>
+      cmd
+        .input(concatVideoPath)
+        .input(finalAudioPath)
+        .videoFilter(`subtitles=${escapeSubtitlesPath(assPath)}`)
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .outputOptions([
+          '-preset', 'medium',
+          '-crf', '20',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-shortest',
+        ])
+        .on('progress', (p) => {
+          if (typeof p.percent === 'number') {
+            onProgress?.({
+              step: '최종 렌더링 + 자막 번인',
+              pct: Math.round(70 + (Math.min(100, p.percent) / 100) * 25),
+            });
+          }
+        })
+        .save(finalPath)
+    );
+  }
 
   // ── 7) 썸네일 ────────────────────────────────────────────────────
   const thumbPath = thumbPathFor(videoId, version);
@@ -274,4 +324,31 @@ function toConcatPath(p: string): string {
 function escapeSubtitlesPath(p: string): string {
   const fwd = p.replace(/\\/g, '/').replace(/:/g, '\\:');
   return `'${fwd}'`;
+}
+
+// ─── 스티커 위치/스케일 헬퍼 ────────────────────────────────────
+
+const SAFE_MARGIN = 40;
+const BOTTOM_SAFE = 220; // YouTube Shorts UI(좋아요/댓글) 회피
+
+function scaleToPixels(scale: StickerScale): number {
+  switch (scale) {
+    case 'SMALL': return 162;   // ~15% of 1080
+    case 'MEDIUM': return 270;  // ~25%
+    case 'LARGE': return 432;   // ~40%
+  }
+}
+
+function positionExpr(pos: StickerPosition): string {
+  switch (pos) {
+    case 'TOP_LEFT': return `${SAFE_MARGIN}:${SAFE_MARGIN}`;
+    case 'TOP_CENTER': return `(W-w)/2:${SAFE_MARGIN}`;
+    case 'TOP_RIGHT': return `W-w-${SAFE_MARGIN}:${SAFE_MARGIN}`;
+    case 'MIDDLE_LEFT': return `${SAFE_MARGIN}:(H-h)/2`;
+    case 'CENTER': return `(W-w)/2:(H-h)/2`;
+    case 'MIDDLE_RIGHT': return `W-w-${SAFE_MARGIN}:(H-h)/2`;
+    case 'BOTTOM_LEFT': return `${SAFE_MARGIN}:H-h-${BOTTOM_SAFE}`;
+    case 'BOTTOM_CENTER': return `(W-w)/2:H-h-${BOTTOM_SAFE}`;
+    case 'BOTTOM_RIGHT': return `W-w-${SAFE_MARGIN}:H-h-${BOTTOM_SAFE}`;
+  }
 }
