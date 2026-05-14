@@ -1,0 +1,54 @@
+# 환경변수 - 절대 커밋 금지 (API 키 노출!)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Node
+node_modules/
+*.log
+npm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+
+# TypeScript
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Prisma
+prisma/migrations/dev/
+
+# 임시/생성 파일
+tmp/
+*.tmp
+cleanup.mjs
+check*.mjs
+checkenv.mjs
+
+# OneDrive 저장 영역 (별도 위치라 어차피 안 들어가지만 안전망)
+shorts-maker/
+
+# Test screenshots / 임시 미디어 (루트의 png/mp3/mp4)
+/*.png
+/*.mp3
+/*.mp4
+/*.m4a
+/*.wav
+
+# Claude/IDE
+.claude/

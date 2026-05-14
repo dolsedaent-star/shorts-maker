@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f3f5;
+  --color-border: #e4e7eb;
+  --color-text: #1a1d22;
+  --color-text-dim: #6b7280;
+  --color-accent: #facc15;        /* 버튼 배경용 (밝은 노랑, 검정 텍스트 잘 보임) */
+  --color-accent-text: #a16207;   /* 텍스트/라벨용 (어두운 amber, 흰 배경에서 가독성 OK) */
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
+/* 셀렉트 박스 화살표 색상 (밝은 테마에서 보이도록) */
+select {
+  background-color: var(--color-surface) !important;
+}
