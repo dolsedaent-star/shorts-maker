@@ -1,4 +1,12 @@
 import type { SubtitleStyle } from '../../lib/subtitleStyle.js';
+import type { TopTextStyle } from '../../lib/topTextStyle.js';
+
+export type TopTextInput = {
+  line1: string;
+  line2: string;
+  style: TopTextStyle;
+  videoDurationSec: number;
+};
 
 /**
  * 섹션 타임라인 → ASS 자막 파일 문자열 생성.
@@ -20,7 +28,8 @@ export type SubtitleSection = {
 export function generateAssFile(
   sections: SubtitleSection[],
   style: SubtitleStyle,
-  appName?: string
+  appName?: string,
+  topText?: TopTextInput
 ): string {
   const fontSize = Math.round(PLAY_RES_X * style.size_ratio);
   const primaryColor = hexToAssColor(style.color);
@@ -32,7 +41,12 @@ export function generateAssFile(
   const textCenterY = PLAY_RES_Y * style.position_y_ratio;
   const halfTextHeight = Math.round(fontSize * 0.6);
   const marginV = Math.max(20, PLAY_RES_Y - textCenterY - halfTextHeight);
-  const textAlignY = PLAY_RES_Y - Math.round(marginV); // bottom-aligned text의 baseline
+  const textAlignY = PLAY_RES_Y - Math.round(marginV);
+
+  // 상단 텍스트 스타일 (Type 2)
+  const topStyles = topText
+    ? buildTopTextStyles(topText.style)
+    : '';
 
   const header =
     `[Script Info]\n` +
@@ -49,8 +63,9 @@ export function generateAssFile(
     `Style: Default,${style.font},${fontSize},${primaryColor},${primaryColor},${outlineColor},${shadowColor},` +
     `1,0,0,0,100,100,0,0,1,${style.outline.width},${style.shadow.offset},2,60,60,${Math.round(marginV)},1\n` +
     `Style: CTA,${style.font},${ctaFontSize},${primaryColor},${primaryColor},${outlineColor},${shadowColor},` +
-    `1,0,0,0,100,100,0,0,1,${style.outline.width + 2},${style.shadow.offset + 2},5,0,0,0,1\n\n` +
-    `[Events]\n` +
+    `1,0,0,0,100,100,0,0,1,${style.outline.width + 2},${style.shadow.offset + 2},5,0,0,0,1\n` +
+    topStyles +
+    `\n[Events]\n` +
     `Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
 
   const dialogues = sections
@@ -90,7 +105,40 @@ export function generateAssFile(
       `{\\fscx0\\fscy0\\t(0,300,\\fscx110\\fscy110)\\t(300,500,\\fscx100\\fscy100)\\fad(0,400)}${escapeAssText(ctaText)}`;
   }
 
-  return header + dialogues + ctaEvent + '\n';
+  // Type 2 상단 텍스트 이벤트 (영상 전체 길이 동안 고정 표시)
+  let topEvents = '';
+  if (topText && (topText.line1 || topText.line2)) {
+    const endTime = formatAssTime(topText.videoDurationSec);
+    // Layer 2: 섹션 자막보다 위
+    if (topText.line1) {
+      topEvents +=
+        `\nDialogue: 2,0:00:00.00,${endTime},TopLine1,,0,0,0,,` +
+        `{\\fad(200,0)}${escapeAssText(topText.line1)}`;
+    }
+    if (topText.line2) {
+      topEvents +=
+        `\nDialogue: 2,0:00:00.00,${endTime},TopLine2,,0,0,0,,` +
+        `{\\fad(200,0)}${escapeAssText(topText.line2)}`;
+    }
+  }
+
+  return header + dialogues + ctaEvent + topEvents + '\n';
+}
+
+function buildTopTextStyles(t: import('../../lib/topTextStyle.js').TopTextStyle): string {
+  const line1Color = hexToAssColor(t.line1Color);
+  const line2Color = hexToAssColor(t.line2Color);
+  const outlineColor = hexToAssColor('#000000');
+  const shadowColor = hexToAssColor('#000000');
+  // Alignment 8 = top-center. MarginV는 상단에서 텍스트 위까지 거리.
+  const marginV1 = t.paddingTop; // line1: 띠 상단으로부터 paddingTop
+  const marginV2 = t.paddingTop + t.size + t.lineGap; // line2: line1 다음
+  return (
+    `Style: TopLine1,${t.font},${t.size},${line1Color},${line1Color},${outlineColor},${shadowColor},` +
+    `1,0,0,0,100,100,0,0,1,${t.outlineWidth},${t.shadowOffset},8,0,0,${marginV1},1\n` +
+    `Style: TopLine2,${t.font},${t.size},${line2Color},${line2Color},${outlineColor},${shadowColor},` +
+    `1,0,0,0,100,100,0,0,1,${t.outlineWidth},${t.shadowOffset},8,0,0,${marginV2},1\n`
+  );
 }
 
 // ─── 헬퍼 ────────────────────────────────────────────────────────────

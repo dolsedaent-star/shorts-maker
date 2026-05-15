@@ -77,6 +77,12 @@ enum StickerScale {
   LARGE
 }
 
+enum VideoFormat {
+  FULLSCREEN_OVERLAY    // 9:16 전체 화면 + 자막 오버레이 (기존)
+  TOP_TEXT_BAND          // 상단 검정 띠 + 텍스트 + 하단 영상 (한국 쇼츠 표준)
+  SPLIT_TOP_BOTTOM       // 위아래 분할 (v2 예약)
+}
+
 // ─── Models ─────────────────────────────────────────────────────────────
 
 /// 앱 1개의 마케팅 캠페인 컨테이너
@@ -112,6 +118,14 @@ model Video {
   thumbnailPath         String?     @map("thumbnail_path")
   /// 사용자가 업로드한 배경음악 파일 경로. 렌더링 시 다이얼로그 위에 깔리고 마지막 1.5초 페이드아웃.
   bgmPath               String?     @map("bgm_path")
+  /// 비디오 포맷 (전체화면 / 상단텍스트띠 / 분할). 기본은 한국 쇼츠 표준 TOP_TEXT_BAND.
+  format                VideoFormat @default(TOP_TEXT_BAND)
+  /// 상단 텍스트 첫 줄 (Type 2 전용)
+  topTextLine1          String?     @map("top_text_line_1")
+  /// 상단 텍스트 둘째 줄 (Type 2 전용)
+  topTextLine2          String?     @map("top_text_line_2")
+  /// 상단 텍스트 스타일 (폰트/색상 등). null이면 기본 한국 스타일.
+  topTextStyle          Json?       @map("top_text_style") @db.JsonB
   createdAt             DateTime    @default(now()) @map("created_at")
   updatedAt             DateTime    @updatedAt @map("updated_at")
 

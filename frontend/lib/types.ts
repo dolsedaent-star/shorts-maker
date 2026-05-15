@@ -22,6 +22,19 @@ export type StickerPosition =
   | 'MIDDLE_LEFT' | 'CENTER' | 'MIDDLE_RIGHT'
   | 'BOTTOM_LEFT' | 'BOTTOM_CENTER' | 'BOTTOM_RIGHT';
 export type StickerScale = 'SMALL' | 'MEDIUM' | 'LARGE';
+export type VideoFormat = 'FULLSCREEN_OVERLAY' | 'TOP_TEXT_BAND' | 'SPLIT_TOP_BOTTOM';
+
+export const VIDEO_FORMAT_LABEL: Record<VideoFormat, string> = {
+  FULLSCREEN_OVERLAY: '전체 화면 + 자막 오버레이',
+  TOP_TEXT_BAND: '상단 텍스트 띠 + 영상',
+  SPLIT_TOP_BOTTOM: '위아래 분할 (준비중)',
+};
+
+export const VIDEO_FORMAT_DESC: Record<VideoFormat, string> = {
+  FULLSCREEN_OVERLAY: '9:16 영상 위에 자막이 얹힘',
+  TOP_TEXT_BAND: '검정 띠에 고정 텍스트 + 아래 영상 (한국 쇼츠 표준)',
+  SPLIT_TOP_BOTTOM: 'v2에서 지원 예정',
+};
 
 export type Sticker = {
   id: string;
@@ -80,6 +93,10 @@ export type Video = {
   subtitleStyleOverride: unknown;
   thumbnailPath: string | null;
   bgmPath: string | null;
+  format: VideoFormat;
+  topTextLine1: string | null;
+  topTextLine2: string | null;
+  topTextStyle: unknown;
   createdAt: string;
   updatedAt: string;
   project?: Project;

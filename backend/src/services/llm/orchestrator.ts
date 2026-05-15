@@ -121,6 +121,7 @@ export async function generateSectionsForVideo(videoId: string, scenarioId: stri
     content: scenario.content,
     totalDurationSeconds: video.durationSeconds,
     sectionCount,
+    format: video.format,
   });
 
   const { text } = await callGemini({
@@ -139,6 +140,8 @@ export async function generateSectionsForVideo(videoId: string, scenarioId: stri
       video_prompt: string;
       script_text: string;
     }>;
+    top_text_line1?: string;
+    top_text_line2?: string;
   }>(text);
 
   // 길이 합 검증
@@ -148,6 +151,12 @@ export async function generateSectionsForVideo(videoId: string, scenarioId: stri
       `Section duration sum (${total}s) does not match video duration (${video.durationSeconds}s)`
     );
   }
+
+  const isType2 = video.format === 'TOP_TEXT_BAND';
+  // 사용자가 이미 직접 편집한 top text는 보존 (LLM 결과로 덮어쓰지 않음)
+  const hasUserTopText = Boolean(video.topTextLine1 || video.topTextLine2);
+  const topLine1 = isType2 && !hasUserTopText ? sanitizeTopLine(parsed.top_text_line1) : null;
+  const topLine2 = isType2 && !hasUserTopText ? sanitizeTopLine(parsed.top_text_line2) : null;
 
   const created = await prisma.$transaction(async (tx) => {
     await tx.section.deleteMany({ where: { videoId } });
@@ -167,12 +176,26 @@ export async function generateSectionsForVideo(videoId: string, scenarioId: stri
     );
     await tx.video.update({
       where: { id: videoId },
-      data: { status: VideoStatus.SECTIONS_READY, selectedScenarioId: scenarioId },
+      data: {
+        status: VideoStatus.SECTIONS_READY,
+        selectedScenarioId: scenarioId,
+        ...(isType2 && !hasUserTopText
+          ? { topTextLine1: topLine1, topTextLine2: topLine2 }
+          : {}),
+      },
     });
     return rows;
   });
 
   return created;
+}
+
+function sanitizeTopLine(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/^["'`]+|["'`]+$/g, '').trim();
+  if (!cleaned) return null;
+  // 12자 초과시 잘라냄 (LLM이 가끔 어겨도 silent fix)
+  return cleaned.length > 12 ? cleaned.slice(0, 12) : cleaned;
 }
 
 // ─── 이미지 기반 video_prompt 재생성 ─────────────────────────────

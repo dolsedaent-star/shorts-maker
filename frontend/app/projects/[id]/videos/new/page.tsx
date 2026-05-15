@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthGate } from '@/components/AuthGate';
 import { api } from '@/lib/api';
-import type { Project, Video } from '@/lib/types';
+import type { Project, Video, VideoFormat } from '@/lib/types';
+import { VIDEO_FORMAT_DESC, VIDEO_FORMAT_LABEL } from '@/lib/types';
 
 export default function NewVideoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -21,6 +22,7 @@ function NewVideoForm({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(18);
+  const [format, setFormat] = useState<VideoFormat>('TOP_TEXT_BAND');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +39,7 @@ function NewVideoForm({ projectId }: { projectId: string }) {
     setLoading(true);
     try {
       const created = await api<Video>('/api/videos', {
-        body: { projectId, title, durationSeconds: duration },
+        body: { projectId, title, durationSeconds: duration, format },
       });
       router.replace(`/videos/${created.id}`);
     } catch (err) {
@@ -68,6 +70,32 @@ function NewVideoForm({ projectId }: { projectId: string }) {
             placeholder="예: 첫 출시 알림"
           />
         </label>
+
+        <div>
+          <span className="text-sm text-[color:var(--color-text-dim)] block mb-1.5">영상 포맷</span>
+          <div className="grid grid-cols-1 gap-2">
+            {(['TOP_TEXT_BAND', 'FULLSCREEN_OVERLAY'] as VideoFormat[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFormat(f)}
+                className={`text-left px-3 py-2.5 rounded border transition ${
+                  format === f
+                    ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10'
+                    : 'border-[color:var(--color-border)] hover:border-[color:var(--color-text-dim)]'
+                }`}
+              >
+                <div className="font-medium text-sm">{VIDEO_FORMAT_LABEL[f]}</div>
+                <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
+                  {VIDEO_FORMAT_DESC[f]}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-[color:var(--color-text-dim)] mt-1.5">
+            상단 텍스트는 시나리오 분할 시 AI가 같이 생성하고, 이후 직접 편집 가능합니다.
+          </div>
+        </div>
 
         <label className="block">
           <span className="text-sm text-[color:var(--color-text-dim)] block mb-1.5">

@@ -10,10 +10,12 @@ import { Storyboard } from '@/components/Storyboard';
 import { RenderProgress } from '@/components/RenderProgress';
 import { StickerManager } from '@/components/StickerManager';
 import { SubtitleStyleEditor } from '@/components/SubtitleStyleEditor';
+import { TopTextEditor } from '@/components/TopTextEditor';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import {
   ANGLE_LABEL,
+  VIDEO_FORMAT_LABEL,
   VIDEO_STATUS_LABEL,
   type RenderArtifact,
   type Scenario,
@@ -115,7 +117,7 @@ function VideoWorkflow({ id }: { id: string }) {
         <div className="min-w-0">
           <h1 className="text-3xl font-bold truncate">{video.title}</h1>
           <div className="text-sm text-[color:var(--color-text-dim)] mt-1">
-            {video.durationSeconds}초 ·{' '}
+            {video.durationSeconds}초 · {VIDEO_FORMAT_LABEL[video.format]} ·{' '}
             <span className="text-[color:var(--color-accent-text)]">{VIDEO_STATUS_LABEL[video.status]}</span>
           </div>
         </div>
@@ -203,6 +205,9 @@ function VideoWorkflow({ id }: { id: string }) {
       {/* ── 3단계: 렌더링 ── */}
       {video.sections && video.sections.length > 0 && (
         <Section title="3. 렌더링">
+          {video.format === 'TOP_TEXT_BAND' && (
+            <TopTextEditor video={video} onChanged={refresh} />
+          )}
           <SubtitleStyleEditor
             videoId={video.id}
             currentOverride={(video.subtitleStyleOverride as Record<string, unknown> | null) ?? null}

@@ -11,13 +11,17 @@ import {
   thumbnailPath as thumbPathFor,
 } from '../../lib/paths.js';
 import { resolveSubtitleStyle } from '../../lib/subtitleStyle.js';
-import { normalizeToVertical, probeAudio, probeVideo } from './normalize.js';
+import { resolveTopTextStyle } from '../../lib/topTextStyle.js';
+import { normalizeToFit, probeAudio, probeVideo } from './normalize.js';
 import { generateAssFile, type SubtitleSection } from './subtitles.js';
 import { extractThumbnail } from './thumbnail.js';
 
 if (env.FFMPEG_PATH) ffmpeg.setFfmpegPath(env.FFMPEG_PATH);
 
 export type RenderProgress = { step: string; pct: number };
+
+const PLAY_RES_X = 1080;
+const PLAY_RES_Y = 1920;
 
 /**
  * 영상 1편 전체 렌더링 파이프라인.
@@ -72,15 +76,30 @@ export async function renderVideo(
   const renderDir = path.join(env.STORAGE_BASE_PATH, 'videos', videoId, 'renders');
   const sectionCount = video.sections.length;
 
+  // 포맷에 따라 섹션 영상 정규화 크기 결정
+  // Type 2 (TOP_TEXT_BAND): 상단 검정 띠 제외하고 1080x1500 (1920-420)
+  // 그 외: 1080x1920 풀화면
+  const isType2 = video.format === 'TOP_TEXT_BAND';
+  const topStyle = isType2 ? resolveTopTextStyle(video.topTextStyle) : null;
+  const videoAreaHeight = isType2 ? PLAY_RES_Y - topStyle!.bandHeight : PLAY_RES_Y;
+  const videoAreaWidth = PLAY_RES_X;
+
   // ── 2) 섹션별 정규화 (전체 진행률의 0-50%) ──────────────────────
   const processedPaths: string[] = [];
   for (let i = 0; i < sectionCount; i++) {
     const s = video.sections[i];
     const procPath = sectionProcessedPath(videoId, s.id);
-    await normalizeToVertical(s.sourceVideoPath!, procPath, s.durationSeconds, (pct) => {
-      const overall = (i / sectionCount) * 50 + (pct / 100) * (50 / sectionCount);
-      onProgress?.({ step: `정규화 ${i + 1}/${sectionCount}`, pct: Math.round(overall) });
-    });
+    await normalizeToFit(
+      s.sourceVideoPath!,
+      procPath,
+      videoAreaWidth,
+      videoAreaHeight,
+      s.durationSeconds,
+      (pct) => {
+        const overall = (i / sectionCount) * 50 + (pct / 100) * (50 / sectionCount);
+        onProgress?.({ step: `정규화 ${i + 1}/${sectionCount}`, pct: Math.round(overall) });
+      }
+    );
     await prisma.section.update({
       where: { id: s.id },
       data: { processedVideoPath: procPath },
@@ -171,23 +190,44 @@ export async function renderVideo(
     return { startSec: start, endSec: cursor, text: s.scriptText };
   });
   const assPath = path.join(renderDir, '_subtitle.ass');
-  await fs.writeFile(assPath, generateAssFile(subSections, style, video.project.appName), 'utf-8');
+  const topTextInput = isType2 && (video.topTextLine1 || video.topTextLine2)
+    ? {
+        line1: video.topTextLine1 ?? '',
+        line2: video.topTextLine2 ?? '',
+        style: topStyle!,
+        videoDurationSec: video.durationSeconds,
+      }
+    : undefined;
+  await fs.writeFile(
+    assPath,
+    generateAssFile(subSections, style, video.project.appName, topTextInput),
+    'utf-8'
+  );
 
   // ── 6) 최종 mux + 자막 burn + 스티커 오버레이 (70-95%) ──────────
   const version = await nextRenderVersion(videoId);
   const finalPath = renderArtifactPath(videoId, version);
   const hasStickers = video.stickers.length > 0;
 
+  // Type 2: 상단 검정 띠 추가하는 pad 필터 (자막/스티커보다 먼저)
+  const topPadFilter = isType2
+    ? `pad=${PLAY_RES_X}:${PLAY_RES_Y}:0:${topStyle!.bandHeight}:color=${topStyle!.bandColor.replace('#', '0x')}`
+    : '';
+
   if (hasStickers) {
-    // 복잡 필터: 자막 burn + 스티커 N개 overlay 체인
+    // 복잡 필터: (옵션) pad → 자막 burn → 스티커 N개 overlay 체인
     await runFfmpeg((cmd) => {
       cmd.input(concatVideoPath).input(finalAudioPath);
       video.stickers.forEach((s) => cmd.input(s.imagePath));
 
-      const filters: string[] = [
-        `[0:v]subtitles=${escapeSubtitlesPath(assPath)}[v_sub]`,
-      ];
-      let lastLabel = 'v_sub';
+      const filters: string[] = [];
+      let lastLabel = '0:v';
+      if (topPadFilter) {
+        filters.push(`[${lastLabel}]${topPadFilter}[v_padded]`);
+        lastLabel = 'v_padded';
+      }
+      filters.push(`[${lastLabel}]subtitles=${escapeSubtitlesPath(assPath)}[v_sub]`);
+      lastLabel = 'v_sub';
       video.stickers.forEach((s, i) => {
         const inputIdx = i + 2; // 0=video, 1=audio
         const widthPx = scaleToPixels(s.scale);
@@ -224,12 +264,15 @@ export async function renderVideo(
         .save(finalPath);
     });
   } else {
-    // 스티커 없음: 단순 videoFilter 경로
+    // 스티커 없음: 단순 videoFilter 경로 (Type 2는 pad+subtitles 체인)
+    const videoFilterChain = topPadFilter
+      ? `${topPadFilter},subtitles=${escapeSubtitlesPath(assPath)}`
+      : `subtitles=${escapeSubtitlesPath(assPath)}`;
     await runFfmpeg((cmd) =>
       cmd
         .input(concatVideoPath)
         .input(finalAudioPath)
-        .videoFilter(`subtitles=${escapeSubtitlesPath(assPath)}`)
+        .videoFilter(videoFilterChain)
         .videoCodec('libx264')
         .audioCodec('aac')
         .outputOptions([
@@ -242,7 +285,7 @@ export async function renderVideo(
         .on('progress', (p) => {
           if (typeof p.percent === 'number') {
             onProgress?.({
-              step: '최종 렌더링 + 자막 번인',
+              step: isType2 ? '최종 렌더링 + 상단 텍스트 + 자막' : '최종 렌더링 + 자막 번인',
               pct: Math.round(70 + (Math.min(100, p.percent) / 100) * 25),
             });
           }

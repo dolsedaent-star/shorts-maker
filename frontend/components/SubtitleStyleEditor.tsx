@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { FONT_PRESETS, findPreset } from '@/lib/fonts';
+import { FONT_PRESETS, findPreset, previewFontStack } from '@/lib/fonts';
 
 type StyleShape = {
   font?: string;
@@ -89,12 +89,7 @@ export function SubtitleStyleEditor({
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span
-                      className="font-semibold"
-                      style={{ fontFamily: `"${f.family}", sans-serif` }}
-                    >
-                      {f.label}
-                    </span>
+                    <span className="font-semibold text-sm">{f.label}</span>
                     <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-dim)]">
                       {f.vibe}
                     </span>
@@ -103,6 +98,12 @@ export function SubtitleStyleEditor({
                         현재 사용 중
                       </span>
                     )}
+                  </div>
+                  <div
+                    className="text-2xl leading-tight mt-1"
+                    style={{ fontFamily: previewFontStack(f) }}
+                  >
+                    지금 다운받기 →
                   </div>
                   <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
                     {f.hint}

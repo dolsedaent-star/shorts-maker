@@ -1,5 +1,45 @@
 @import "tailwindcss";
 
+/* ── 폰트 프리뷰용 웹폰트 (실제 영상 렌더링은 Windows 설치 폰트 사용) ── */
+@import url('https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Black+Han+Sans&family=Jua&family=Single+Day&family=Diphylleia&display=swap');
+
+@font-face {
+  font-family: 'PreviewJalnan';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.2/Jalnan.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PreviewGmarketBold';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/GmarketSansTTFBold.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PreviewPretendardExtraBold';
+  src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/Pretendard-ExtraBold.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PreviewCafe24Ssurround';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Cafe24Ssurround.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PreviewCafe24Ohsquare';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_one@1.0/Cafe24Ohsquare.woff') format('woff');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PreviewTmoneyRoundWind';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2207-2@1.1/TmoneyRoundWindExtraBold.woff') format('woff');
+  font-display: swap;
+}
+
+
 @theme {
   --color-bg: #f7f8fa;
   --color-surface: #ffffff;

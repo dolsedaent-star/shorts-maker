@@ -4,7 +4,7 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { VideoStatus } from '@prisma/client';
+import { VideoFormat, VideoStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../auth/auth.js';
 import { videoBgmPath, videoWorkDir } from '../lib/paths.js';
@@ -20,6 +20,7 @@ const CreateVideo = z.object({
   projectId: z.string().uuid(),
   title: z.string().min(1).max(200),
   durationSeconds: z.number().int().min(5).max(60),
+  format: z.nativeEnum(VideoFormat).optional(),
 });
 
 router.post('/', async (req, res) => {
@@ -59,6 +60,10 @@ router.delete('/:id', async (req, res) => {
 const UpdateVideo = z.object({
   title: z.string().min(1).optional(),
   subtitleStyleOverride: z.record(z.unknown()).nullable().optional(),
+  format: z.nativeEnum(VideoFormat).optional(),
+  topTextLine1: z.string().max(20).nullable().optional(),
+  topTextLine2: z.string().max(20).nullable().optional(),
+  topTextStyle: z.record(z.unknown()).nullable().optional(),
 });
 router.patch('/:id', async (req, res) => {
   const parse = UpdateVideo.safeParse(req.body);

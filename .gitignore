@@ -50,5 +50,8 @@ shorts-maker/
 /*.m4a
 /*.wav
 
+# 참조용 샘플 스크린샷 (트래킹 불필요)
+/sample/
+
 # Claude/IDE
 .claude/
